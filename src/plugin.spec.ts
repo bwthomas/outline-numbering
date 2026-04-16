@@ -1,5 +1,5 @@
-import { Schema, Node as PMNode } from '@tiptap/pm/model';
-import { EditorState } from '@tiptap/pm/state';
+import { Schema, Node as PMNode } from 'prosemirror-model';
+import { EditorState } from 'prosemirror-state';
 import {
   computeDecorations,
   outlineNumberingPlugin,

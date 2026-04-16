@@ -23,17 +23,34 @@
     "alphanumeric",
     "decimal"
   ],
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./tiptap": "./src/tiptap.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./tiptap": {
+      "types": "./dist/tiptap.d.ts",
+      "import": "./dist/tiptap.js",
+      "require": "./dist/tiptap.cjs"
+    }
   },
   "files": [
-    "src",
+    "dist",
     "README.md",
     "LICENSE"
   ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "ci": "npm run typecheck && npm run test && npm run build"
+  },
   "peerDependencies": {
     "@tiptap/core": "^3.0.0",
     "prosemirror-state": "^1.0.0",
@@ -41,5 +58,14 @@
   },
   "peerDependenciesMeta": {
     "@tiptap/core": { "optional": true }
+  },
+  "devDependencies": {
+    "@tiptap/core": "^3.22.3",
+    "prosemirror-model": "^1.25.0",
+    "prosemirror-state": "^1.4.0",
+    "prosemirror-view": "^1.40.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
   }
 }
