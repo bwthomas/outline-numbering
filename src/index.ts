@@ -1,9 +1,9 @@
 export {
   OutlineNumbering,
   OutlineNumberingOptions,
-  OUTLINE_NUMBERING_KEY,
-  formatMarker,
+  OutlineNumberingStrategy,
+  harvardStrategy,
   toRoman,
   toLetter,
-  getOutlineNumberingStyles,
+  computeDecorations,
 } from './outline-numbering';

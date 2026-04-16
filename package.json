@@ -1,7 +1,7 @@
 {
   "name": "@scrible/tiptap-outline-numbering",
   "version": "0.1.0",
-  "description": "TipTap extension for Purdue OWL academic outline numbering (I/A/1/a)",
+  "description": "TipTap extension for nested ordered-list numbering with pluggable strategies (default: Harvard I/A/1/a)",
   "license": "MIT",
   "main": "src/index.ts",
   "peerDependencies": {
