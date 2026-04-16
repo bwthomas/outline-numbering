@@ -1,0 +1,11 @@
+{
+  "name": "@scrible/tiptap-outline-numbering",
+  "version": "0.1.0",
+  "description": "TipTap extension for Purdue OWL academic outline numbering (I/A/1/a)",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "@tiptap/core": "^3.0.0",
+    "@tiptap/pm": "^3.0.0"
+  }
+}
