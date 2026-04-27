@@ -299,6 +299,37 @@ describe('computeDecorations — decoration attributes', () => {
   });
 });
 
+describe('computeDecorations — renderMarkerInline (DOM widget mode)', () => {
+  it('off by default: emits only node decorations', () => {
+    const doc = d(ol(item('a'), item('b')));
+    const set = computeDecorations(doc, alphanumericStrategy);
+    const decos: any[] = set.find();
+    // 2 list items × 1 node decoration each = 2 total when widget mode is off
+    expect(decos.length).toBe(2);
+    expect(decos.every((d: any) => d.type?.attrs?.['data-outline-marker'])).toBe(true);
+  });
+
+  it('renderMarkerInline=true: emits a widget decoration alongside each node decoration', () => {
+    const doc = d(ol(item('a'), item('b')));
+    const set = computeDecorations(doc, alphanumericStrategy, true, true);
+    const decos: any[] = set.find();
+    // 2 node decorations + 2 widget decorations = 4 total
+    expect(decos.length).toBe(4);
+    const widgets = decos.filter((d: any) => d.type?.toDOM != null || d.type?.spec?.toDOM != null);
+    // widget decorations have a toDOM constructor on the type
+    const nodeDecos = decos.filter((d: any) => d.type?.attrs?.['data-outline-marker']);
+    expect(nodeDecos.length).toBe(2);
+    expect(widgets.length + nodeDecos.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('renderMarkerInline=true on nested lists also produces widgets', () => {
+    const doc = d(ol(item('a', ol(item('a-i'))), item('b')));
+    const set = computeDecorations(doc, alphanumericStrategy, true, true);
+    // 3 list items × (1 node + 1 widget) = 6 decorations
+    expect(set.find().length).toBe(6);
+  });
+});
+
 describe('outlineNumberingPlugin — ProseMirror plugin integration', () => {
   it('exposes its DecorationSet via OUTLINE_NUMBERING_KEY', () => {
     const state = EditorState.create({

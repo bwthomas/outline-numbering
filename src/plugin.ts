@@ -34,6 +34,16 @@ export interface OutlineNumberingPluginOptions {
    * direct children of a listItem are numbered.
    */
   descendThroughContainers: boolean;
+  /**
+   * When true, also emit a widget decoration `<span class="outline-marker">…</span>`
+   * at the start of each numbered listItem. Off by default for back-compat — the
+   * historical pattern is `::before { content: attr(data-outline-marker); }` in
+   * consumer CSS, which leaves the marker invisible to screen readers (SR users
+   * hear only "list item"). Turn on to make markers part of the rendered DOM
+   * so SR voicing includes them; the consumer's CSS must then style
+   * `.outline-marker` instead of `::before`.
+   */
+  renderMarkerInline: boolean;
 }
 
 /**
@@ -47,16 +57,17 @@ export function outlineNumberingPlugin(
 ): Plugin<DecorationSet> {
   const strategy = options.strategy ?? alphanumericStrategy;
   const descendThroughContainers = options.descendThroughContainers ?? true;
+  const renderMarkerInline = options.renderMarkerInline ?? false;
 
   return new Plugin<DecorationSet>({
     key: OUTLINE_NUMBERING_KEY,
     state: {
       init(_, { doc }) {
-        return computeDecorations(doc, strategy, descendThroughContainers);
+        return computeDecorations(doc, strategy, descendThroughContainers, renderMarkerInline);
       },
       apply(tr, decorationSet) {
         if (tr.docChanged) {
-          return computeDecorations(tr.doc, strategy, descendThroughContainers);
+          return computeDecorations(tr.doc, strategy, descendThroughContainers, renderMarkerInline);
         }
         return decorationSet.map(tr.mapping, tr.doc);
       },
@@ -78,6 +89,7 @@ export function computeDecorations(
   doc: any,
   strategy: OutlineNumberingStrategy,
   descendThroughContainers: boolean = true,
+  renderMarkerInline: boolean = false,
 ): DecorationSet {
   const decorations: Decoration[] = [];
 
@@ -107,12 +119,32 @@ export function computeDecorations(
       }
       counter++;
       const itemPos = offset + childOffset;
+      const markerText = strategy.format(counter, depth);
       decorations.push(
         Decoration.node(itemPos, itemPos + child.nodeSize, {
           'data-outline-depth': String(depth),
-          'data-outline-marker': strategy.format(counter, depth),
+          'data-outline-marker': markerText,
         }),
       );
+
+      if (renderMarkerInline) {
+        // Widget at the start of the listItem renders the marker as part
+        // of the DOM so screen readers voice it as content. Pure rendering —
+        // not part of the document model, so copy/paste/transactions are
+        // unchanged. `side: -1` puts it before any inline content;
+        // `pointer-events: none` so clicks pass through to the listItem.
+        decorations.push(
+          Decoration.widget(itemPos + 1, () => {
+            const span = document.createElement('span');
+            span.className = 'outline-marker';
+            span.setAttribute('aria-hidden', 'false');
+            span.setAttribute('data-outline-marker', markerText);
+            span.style.pointerEvents = 'none';
+            span.textContent = markerText;
+            return span;
+          }, { side: -1, key: `outline-marker-${depth}-${counter}-${markerText}` }),
+        );
+      }
 
       let grandOffset = itemPos + 1;
       child.forEach((grandchild: any) => {
