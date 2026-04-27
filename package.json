@@ -1,6 +1,6 @@
 {
   "name": "@bwthomas/outline-numbering",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Framework-agnostic ProseMirror plugin (with Tiptap wrapper) for nested ordered-list numbering with pluggable strategies: alphanumeric (Harvard / Purdue OWL I/A/1/a), decimal, legal, arabic, lower-roman, or custom.",
   "license": "MIT",
   "author": "Blake Thomas <bwthomas@users.noreply.github.com>",
@@ -58,7 +58,9 @@
     "prosemirror-view": "^1.0.0"
   },
   "peerDependenciesMeta": {
-    "@tiptap/core": { "optional": true }
+    "@tiptap/core": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@tiptap/core": "^3.22.3",
