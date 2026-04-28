@@ -44,6 +44,20 @@ export interface OutlineNumberingPluginOptions {
    * `.outline-marker` instead of `::before`.
    */
   renderMarkerInline: boolean;
+  /**
+   * Sibling node types that should NOT reset the orderedList counter when
+   * they appear between two orderedLists at the same level. Defaults to `[]`
+   * (every non-orderedList sibling resets). For example, an outline editor
+   * may want callouts/citations placed between list items not to interrupt
+   * the numbering of the surrounding list:
+   *
+   *   [ol[1, 2], citation, ol[3, 4]]   →  numbering stays I, II, III, IV
+   *   [ol[1, 2], heading,  ol[3, 4]]   →  numbering resets — I, II, I, II
+   *
+   * Headings, paragraphs, and any other "hard break" sibling reset the
+   * counter even with this option set, unless they're listed too.
+   */
+  continueAcrossNodeTypes: string[];
 }
 
 /**
@@ -58,16 +72,17 @@ export function outlineNumberingPlugin(
   const strategy = options.strategy ?? alphanumericStrategy;
   const descendThroughContainers = options.descendThroughContainers ?? true;
   const renderMarkerInline = options.renderMarkerInline ?? false;
+  const continueAcrossNodeTypes = options.continueAcrossNodeTypes ?? [];
 
   return new Plugin<DecorationSet>({
     key: OUTLINE_NUMBERING_KEY,
     state: {
       init(_, { doc }) {
-        return computeDecorations(doc, strategy, descendThroughContainers, renderMarkerInline);
+        return computeDecorations(doc, strategy, descendThroughContainers, renderMarkerInline, continueAcrossNodeTypes);
       },
       apply(tr, decorationSet) {
         if (tr.docChanged) {
-          return computeDecorations(tr.doc, strategy, descendThroughContainers, renderMarkerInline);
+          return computeDecorations(tr.doc, strategy, descendThroughContainers, renderMarkerInline, continueAcrossNodeTypes);
         }
         return decorationSet.map(tr.mapping, tr.doc);
       },
@@ -90,27 +105,53 @@ export function computeDecorations(
   strategy: OutlineNumberingStrategy,
   descendThroughContainers: boolean = true,
   renderMarkerInline: boolean = false,
+  continueAcrossNodeTypes: string[] = [],
 ): DecorationSet {
   const decorations: Decoration[] = [];
+  const continueSet = new Set(continueAcrossNodeTypes);
 
-  function walk(node: any, pos: number, depth: number, insideListItem: boolean) {
-    if (node.type.name === 'orderedList') {
-      walkOrderedList(node, pos, depth);
-      return;
-    }
-    if (insideListItem && !descendThroughContainers) return;
-    if (!node.isBlock || node.isLeaf) return;
-    const offset = pos + (node.type.name === 'doc' ? 0 : 1);
+  /** Walk a parent's children, handling orderedLists with run-counter
+   *  continuity. The runCounter accumulates across consecutive
+   *  orderedList siblings (and any siblings whose type is in
+   *  continueSet); any other sibling resets the run. */
+  function iterateChildren(parent: any, parentChildrenStart: number, depth: number, insideListItem: boolean) {
     let childOffset = 0;
-    node.forEach((child: any) => {
-      walk(child, offset + childOffset, depth, insideListItem);
+    let runCounter = 0;
+    parent.forEach((child: any) => {
+      const childPos = parentChildrenStart + childOffset;
+      if (child.type.name === 'orderedList') {
+        runCounter = walkOrderedList(child, childPos, depth, runCounter);
+      } else {
+        if (!continueSet.has(child.type.name)) {
+          runCounter = 0;
+        }
+        walk(child, childPos, depth, insideListItem);
+      }
       childOffset += child.nodeSize;
     });
   }
 
-  function walkOrderedList(node: any, pos: number, depth: number) {
+  function walk(node: any, pos: number, depth: number, insideListItem: boolean) {
+    if (node.type.name === 'orderedList') {
+      // Direct call (e.g. recursion landed on an orderedList without
+      // going through a parent's iterateChildren). Treat as a fresh run.
+      walkOrderedList(node, pos, depth, 0);
+      return;
+    }
+    if (insideListItem && !descendThroughContainers) return;
+    if (!node.isBlock || node.isLeaf) return;
+    const childrenStart = pos + (node.type.name === 'doc' ? 0 : 1);
+    iterateChildren(node, childrenStart, depth, insideListItem);
+  }
+
+  /** Walk one orderedList, emitting decorations for its listItem
+   *  children. `startCounter` is the running counter inherited from
+   *  any preceding orderedList siblings in the same run. Returns the
+   *  counter value after the last listItem so the caller can pass it
+   *  to the next orderedList in the run. */
+  function walkOrderedList(node: any, pos: number, depth: number, startCounter: number): number {
     const offset = pos + 1;
-    let counter = 0;
+    let counter = startCounter;
     let childOffset = 0;
     node.forEach((child: any) => {
       if (child.type.name !== 'listItem') {
@@ -146,13 +187,13 @@ export function computeDecorations(
         );
       }
 
-      let grandOffset = itemPos + 1;
-      child.forEach((grandchild: any) => {
-        walk(grandchild, grandOffset, depth + 1, true);
-        grandOffset += grandchild.nodeSize;
-      });
+      // Recurse into the listItem's children with depth+1, using the
+      // same run-counter logic so nested adjacent orderedLists also
+      // continue across continue-set siblings.
+      iterateChildren(child, itemPos + 1, depth + 1, true);
       childOffset += child.nodeSize;
     });
+    return counter;
   }
 
   walk(doc, 0, 0, false);

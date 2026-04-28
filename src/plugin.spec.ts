@@ -371,3 +371,67 @@ describe('outlineNumberingPlugin — ProseMirror plugin integration', () => {
     expect(OUTLINE_NUMBERING_KEY.getState(state)!.find().length).toBe(1);
   });
 });
+
+describe('computeDecorations — continueAcrossNodeTypes', () => {
+  it('default ([]): every non-orderedList sibling resets the counter', () => {
+    // [ol[I, II], paragraph, ol[I, II]] — paragraph is the break.
+    const document = d(ol(item('a'), item('b')), p('break'), ol(item('c'), item('d')));
+    const markers = extractMarkers(
+      computeDecorations(document, alphanumericStrategy),
+    ).map((x) => x.marker);
+    expect(markers).toEqual(['I.', 'II.', 'I.', 'II.']);
+  });
+
+  it('with continueAcrossNodeTypes including paragraph: counter continues', () => {
+    // Same doc as above, but paragraph is in the continue-set, so the
+    // run carries: I, II, [paragraph], III, IV.
+    const document = d(ol(item('a'), item('b')), p('soft-break'), ol(item('c'), item('d')));
+    const markers = extractMarkers(
+      computeDecorations(document, alphanumericStrategy, true, false, ['paragraph']),
+    ).map((x) => x.marker);
+    expect(markers).toEqual(['I.', 'II.', 'III.', 'IV.']);
+  });
+
+  it('non-listed sibling between continue-set siblings still resets the run', () => {
+    // [ol[I, II], paragraph, blockquote, ol[I, II]] — blockquote isn't
+    // in the continue-set even though paragraph is; the run resets at
+    // the blockquote.
+    const document = d(
+      ol(item('a'), item('b')),
+      p('soft'),
+      bq(p('hard')),
+      ol(item('c'), item('d')),
+    );
+    const markers = extractMarkers(
+      computeDecorations(document, alphanumericStrategy, true, false, ['paragraph']),
+    ).map((x) => x.marker);
+    expect(markers).toEqual(['I.', 'II.', 'I.', 'II.']);
+  });
+
+  it('continuity applies independently at nested depths', () => {
+    // listItem at depth 0 contains: ol[a], paragraph (in continue-set), ol[b].
+    // Inner counters should continue: A, B (depth 1).
+    const document = d(
+      ol(
+        item('outer-1',
+          ol(item('inner-a')),
+          p('soft'),
+          ol(item('inner-b')),
+        ),
+      ),
+    );
+    const markers = extractMarkers(
+      computeDecorations(document, alphanumericStrategy, true, false, ['paragraph']),
+    ).map((x) => x.marker);
+    expect(markers).toEqual(['I.', 'A.', 'B.']);
+  });
+
+  it('plugin honors continueAcrossNodeTypes via integration path', () => {
+    const state = EditorState.create({
+      doc: d(ol(item('a'), item('b')), p('soft'), ol(item('c'), item('d'))),
+      plugins: [outlineNumberingPlugin({ continueAcrossNodeTypes: ['paragraph'] })],
+    });
+    const markers = extractMarkers(OUTLINE_NUMBERING_KEY.getState(state)!).map((x) => x.marker);
+    expect(markers).toEqual(['I.', 'II.', 'III.', 'IV.']);
+  });
+});
